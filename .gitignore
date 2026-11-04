@@ -1,0 +1,26 @@
+# Runtime / local lab artifacts
+cache/
+wsl/
+*.log
+*.status
+*.bak*
+*.vhdx
+*.tar.gz
+
+# Node
+node_modules/
+npm-debug.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+*.tmp
+
+# Secrets / local overrides
+.env
+.env.*
+!.env.example
+configs/*.local.yaml

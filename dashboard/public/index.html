@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Open5GS Mask · Lab Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="bg-grid" aria-hidden="true"></div>
+  <div class="bg-glow" aria-hidden="true"></div>
+
+  <header class="top">
+    <div class="brand">
+      <h1>Open5GS Mask</h1>
+    </div>
+    <div class="top-actions">
+      <span id="clock" class="clock">—</span>
+      <a class="btn ghost" href="http://localhost:9999" target="_blank" rel="noopener">WebUI SIMs</a>
+      <button class="btn" id="btn-refresh" type="button">Atualizar</button>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab active" data-tab="overview" type="button">Visão geral</button>
+    <button class="tab" data-tab="sims" type="button">SIM cards</button>
+    <button class="tab" data-tab="ran" type="button">UERANSIM</button>
+    <button class="tab" data-tab="config" type="button">Configuração</button>
+  </nav>
+
+  <main>
+    <section id="tab-overview" class="panel active">
+      <div class="hero-status">
+        <div class="hero-copy">
+          <h2>Status do laboratório</h2>
+          <p>Core Open5GS, gNB e UEs em um só lugar. A aba <strong>WebUI SIMs</strong> continua no Open5GS clássico para cadastrar assinantes.</p>
+        </div>
+        <div class="hero-pills">
+          <div class="pill" id="pill-core"><span class="dot"></span><span>Core</span></div>
+          <div class="pill" id="pill-gnb"><span class="dot"></span><span>gNB</span></div>
+          <div class="pill" id="pill-ue"><span class="dot"></span><span>UEs</span></div>
+        </div>
+      </div>
+
+      <div class="stat-row">
+        <article class="stat">
+          <p class="stat-label">Gateway UPF</p>
+          <p class="stat-value mono" id="ogstun-ip">—</p>
+          <p class="stat-note" id="ogstun-note">ogstun</p>
+        </article>
+        <article class="stat">
+          <p class="stat-label">UEs conectados</p>
+          <p class="stat-value" id="ue-count">0</p>
+          <p class="stat-note">interfaces virtuais ativas</p>
+        </article>
+        <article class="stat">
+          <p class="stat-label">SIMs cadastrados</p>
+          <p class="stat-value" id="sim-count">0</p>
+          <p class="stat-note">banco MongoDB</p>
+        </article>
+        <article class="stat">
+          <p class="stat-label">Serviços ativos</p>
+          <p class="stat-value" id="svc-count">0/0</p>
+          <p class="stat-note">Open5GS + Mongo</p>
+        </article>
+      </div>
+
+      <div class="grid-2">
+        <section class="block">
+          <header class="block-head">
+            <h3>Open5GS</h3>
+            <span class="chip" id="core-chip">—</span>
+          </header>
+          <div class="svc-grid" id="svc-grid"></div>
+        </section>
+        <section class="block">
+          <header class="block-head">
+            <h3>UEs ao vivo</h3>
+          </header>
+          <div id="live-ues" class="list"></div>
+        </section>
+      </div>
+    </section>
+
+    <section id="tab-sims" class="panel">
+      <div class="block">
+        <header class="block-head">
+          <div>
+            <h3>SIM cards</h3>
+            <p class="muted">Assinantes no Core. Para criar/editar chaves K/OPc, use a WebUI oficial.</p>
+          </div>
+          <a class="btn ghost" href="http://localhost:9999" target="_blank" rel="noopener">Abrir cadastro</a>
+        </header>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>IMSI</th>
+                <th>APN</th>
+                <th>IP estático</th>
+                <th>IP ao vivo</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody id="sim-table"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-ran" class="panel">
+      <div class="grid-2">
+        <section class="block">
+          <header class="block-head">
+            <h3>gNB</h3>
+            <span class="chip" id="gnb-chip">—</span>
+          </header>
+          <p class="muted">Emulador de estação base (UERANSIM). Precisa do AMF ativo.</p>
+          <div class="btn-row">
+            <button class="btn" type="button" data-action="start-gnb">Ligar gNB</button>
+            <button class="btn danger" type="button" data-action="stop-gnb">Parar gNB</button>
+          </div>
+          <pre class="log" id="log-gnb">Aguardando…</pre>
+        </section>
+        <section class="block">
+          <header class="block-head">
+            <h3>UE</h3>
+            <span class="chip" id="ue-chip">—</span>
+          </header>
+          <p class="muted">Terminal simulado. Usa o SIM padrão 999700000000001.</p>
+          <div class="btn-row">
+            <button class="btn" type="button" data-action="start-ue">Ligar UE</button>
+            <button class="btn danger" type="button" data-action="stop-ue">Parar UE</button>
+          </div>
+          <pre class="log" id="log-ue">Aguardando…</pre>
+        </section>
+      </div>
+      <section class="block">
+        <header class="block-head"><h3>Sessões PDU</h3></header>
+        <div id="ran-ues" class="list"></div>
+      </section>
+    </section>
+
+    <section id="tab-config" class="panel">
+      <p class="lead">Edite só os IPs e parâmetros principais. Um backup automático é criado antes de salvar. Reiniciar o serviço aplica a mudança no Core.</p>
+      <div class="config-grid">
+        <form class="block form" id="form-gnb">
+          <header class="block-head"><h3>gNB (UERANSIM)</h3></header>
+          <div class="fields">
+            <label>linkIp<input name="linkIp" /></label>
+            <label>ngapIp<input name="ngapIp" /></label>
+            <label>gtpIp<input name="gtpIp" /></label>
+            <label>AMF address<input name="amfAddress" /></label>
+            <label>AMF port<input name="amfPort" /></label>
+            <label>MCC<input name="mcc" /></label>
+            <label>MNC<input name="mnc" /></label>
+            <label>TAC<input name="tac" /></label>
+          </div>
+          <button class="btn" type="submit">Salvar gNB</button>
+        </form>
+
+        <form class="block form" id="form-amf">
+          <header class="block-head"><h3>AMF</h3></header>
+          <div class="fields">
+            <label>NGAP address<input name="ngapAddress" /></label>
+            <label>SBI address<input name="sbiAddress" /></label>
+            <label>SBI port<input name="sbiPort" /></label>
+            <label>MCC<input name="mcc" /></label>
+            <label>MNC<input name="mnc" /></label>
+            <label>TAC<input name="tac" /></label>
+            <label>Network name<input name="networkName" /></label>
+          </div>
+          <label class="check"><input type="checkbox" name="restart" checked /> Reiniciar AMF após salvar</label>
+          <button class="btn" type="submit">Salvar AMF</button>
+        </form>
+
+        <form class="block form" id="form-smf">
+          <header class="block-head"><h3>SMF</h3></header>
+          <div class="fields">
+            <label>PFCP address<input name="pfcpAddress" /></label>
+            <label>UPF address<input name="upfAddress" /></label>
+            <label>GTP-U address<input name="gtpuAddress" /></label>
+            <label>Subnet UE<input name="subnet" /></label>
+            <label>Gateway<input name="gateway" /></label>
+            <label>DNS (vírgula)<input name="dns" /></label>
+          </div>
+          <label class="check"><input type="checkbox" name="restart" checked /> Reiniciar SMF após salvar</label>
+          <button class="btn" type="submit">Salvar SMF</button>
+        </form>
+
+        <form class="block form" id="form-upf">
+          <header class="block-head"><h3>UPF</h3></header>
+          <div class="fields">
+            <label>PFCP address<input name="pfcpAddress" /></label>
+            <label>GTP-U address<input name="gtpuAddress" /></label>
+            <label>Subnet UE<input name="subnet" /></label>
+            <label>Gateway (ogstun)<input name="gateway" /></label>
+          </div>
+          <label class="check"><input type="checkbox" name="restart" checked /> Reiniciar UPF após salvar</label>
+          <button class="btn" type="submit">Salvar UPF</button>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" hidden></div>
+  <script src="/app.js"></script>
+</body>
+</html>
