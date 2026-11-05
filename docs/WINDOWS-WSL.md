@@ -22,6 +22,16 @@ sudo bash scripts/install-lab-helpers.sh
 
 4. No Windows, a porta `8080` (dashboard) e `9999` (WebUI) são acessíveis via `localhost` com o encaminhamento padrão do WSL2.
 
+## Laboratório remoto
+
+Se o Open5GS já está em um servidor Linux, o Windows não precisa do WSL. Abra só o túnel e use o navegador:
+
+```powershell
+ssh -L 8080:127.0.0.1:8080 -L 9999:127.0.0.1:9999 usuario@servidor-do-core
+```
+
+http://localhost:8080 é o Mask. http://localhost:9999 é a WebUI oficial dos SIMs.
+
 Scripts auxiliares em `windows/`:
 
 - `iniciar-lab.ps1` / `parar-lab.ps1` / `ver-lab.ps1`

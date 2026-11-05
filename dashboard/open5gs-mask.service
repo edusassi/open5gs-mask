@@ -1,0 +1,21 @@
+[Unit]
+Description=Open5GS Mask dashboard
+After=network-online.target mongod.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/open5gs-mask-dashboard
+ExecStart=/usr/bin/node /opt/open5gs-mask-dashboard/server.js
+Restart=on-failure
+RestartSec=3
+Environment=PORT=8080
+Environment=HOSTNAME=0.0.0.0
+Environment=MONGO_URI=mongodb://127.0.0.1:27017
+# Preencha somente quando a gNB e os UEs estiverem em outra máquina.
+# Environment=RAN_HOST=192.168.122.20
+# Environment=RAN_USER=admin
+# Environment=RAN_SSH_KEY=/root/.ssh/id_mask
+
+[Install]
+WantedBy=multi-user.target

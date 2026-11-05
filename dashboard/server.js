@@ -57,6 +57,52 @@ function unitActive(unit) {
   }
 }
 
+const RAN_HOST = process.env.RAN_HOST || '';
+const RAN_USER = process.env.RAN_USER || 'admin';
+const RAN_KEY = process.env.RAN_SSH_KEY || '/root/.ssh/id_mask';
+
+let ranCache = { at: 0, data: null };
+
+function remoteRan() {
+  if (!RAN_HOST) return null;
+  const now = Date.now();
+  if (now - ranCache.at < 4000) return ranCache.data;
+  ranCache.at = now;
+  try {
+    const out = sh('ssh', [
+      '-i', RAN_KEY,
+      '-o', 'BatchMode=yes',
+      '-o', 'ConnectTimeout=4',
+      '-o', 'StrictHostKeyChecking=accept-new',
+      `${RAN_USER}@${RAN_HOST}`,
+      'sudo -n /usr/local/sbin/mask-ran status',
+    ], { timeout: 6000, allowFail: true });
+    const data = { gnb: false, ues: [], log: [] };
+    for (const line of out.split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      if (trimmed.startsWith('GNB ')) {
+        data.gnb = trimmed.endsWith('1');
+      } else if (trimmed.startsWith('UE ')) {
+        const [, imsi, iface, ip] = trimmed.split(/\s+/);
+        data.ues.push({
+          imsi: imsi && imsi !== 'unknown' ? imsi : null,
+          iface: iface || null,
+          ip: ip && ip.includes('.') ? ip : null,
+          namespace: null,
+          source: 'ran',
+        });
+      } else {
+        data.log.push(trimmed);
+      }
+    }
+    ranCache.data = data;
+  } catch {
+    ranCache.data = null;
+  }
+  return ranCache.data;
+}
+
 function pgrep(pattern) {
   try {
     const out = sh('pgrep', ['-af', pattern], { allowFail: true });
@@ -127,7 +173,8 @@ function listConnectedUes() {
       source: 'host',
     });
   }
-  return ues;
+  if (ues.length) return ues;
+  return remoteRan()?.ues?.filter((u) => u.ip) || [];
 }
 
 function gnbStatus() {
@@ -139,20 +186,42 @@ function gnbStatus() {
     const sctp = sh('bash', ['-lc', 'ss --sctp -tn 2>/dev/null | head -40 || true'], { allowFail: true });
     connected = /38412/.test(sctp);
   }
+  if (procs.length) {
+    return {
+      running: true,
+      connected: connected || procs.length > 0,
+      processes: procs,
+      logTail: log.split('\n').slice(-12),
+    };
+  }
+  const remote = remoteRan();
+  if (remote?.gnb) {
+    return {
+      running: true,
+      connected: true,
+      processes: [`nr-gnb@${RAN_HOST}`],
+      logTail: remote.log.length ? remote.log : ['gNB ativo na VM do UERANSIM'],
+    };
+  }
   return {
-    running: procs.length > 0,
-    connected: procs.length > 0 && connected,
-    processes: procs,
+    running: false,
+    connected: false,
+    processes: [],
     logTail: log.split('\n').slice(-12),
   };
 }
 
 function ueStatus() {
   const procs = pgrep('nr-ue');
+  if (procs.length) {
+    return { running: true, count: procs.length, processes: procs };
+  }
+  const remote = remoteRan();
+  const count = remote?.ues?.length || 0;
   return {
-    running: procs.length > 0,
-    count: procs.length,
-    processes: procs,
+    running: count > 0,
+    count,
+    processes: count ? [`nr-ue@${RAN_HOST}`] : [],
   };
 }
 
@@ -230,11 +299,33 @@ function getUpfConfig() {
   };
 }
 
+function gnbConfigPath() {
+  if (fs.existsSync(GNB_CFG)) return GNB_CFG;
+  const sample = '/opt/UERANSIM/config/open5gs-gnb.yaml';
+  if (fs.existsSync(sample)) return sample;
+  return null;
+}
+
 function getGnbConfig() {
-  const file = fs.existsSync(GNB_CFG) ? GNB_CFG : '/opt/UERANSIM/config/open5gs-gnb.yaml';
+  const file = gnbConfigPath();
+  if (!file) {
+    return {
+      file: null,
+      available: false,
+      mcc: '',
+      mnc: '',
+      tac: '',
+      linkIp: '',
+      ngapIp: '',
+      gtpIp: '',
+      amfAddress: '',
+      amfPort: 38412,
+    };
+  }
   const { data } = loadYamlFile(file);
   return {
     file,
+    available: true,
     mcc: data.mcc || '',
     mnc: data.mnc || '',
     tac: data.tac ?? '',
@@ -305,7 +396,8 @@ function saveUpfConfig(body) {
 }
 
 function saveGnbConfig(body) {
-  const file = fs.existsSync(GNB_CFG) ? GNB_CFG : '/opt/UERANSIM/config/open5gs-gnb.yaml';
+  const file = gnbConfigPath();
+  if (!file) throw new Error('Arquivo do gNB não está nesta máquina');
   backupFile(file);
   const { data } = loadYamlFile(file);
   data.mcc = String(body.mcc);
@@ -435,7 +527,11 @@ app.post('/api/actions/:action', (req, res) => {
 
     if (action === 'start-gnb') {
       if (pgrep('nr-gnb').length) return res.json({ ok: true, message: 'gNB já está rodando' });
-      const cfg = fs.existsSync(GNB_CFG) ? GNB_CFG : '/opt/UERANSIM/config/open5gs-gnb.yaml';
+      if (!fs.existsSync(GNB_BIN)) {
+        return res.status(400).json({ error: 'UERANSIM não está nesta máquina. O gNB sobe no host do RAN.' });
+      }
+      const cfg = gnbConfigPath();
+      if (!cfg) return res.status(400).json({ error: 'Arquivo de configuração do gNB não encontrado' });
       const out = fs.openSync(path.join(LOG_DIR, 'gnb.log'), 'a');
       const child = spawn(GNB_BIN, ['-c', cfg], { detached: true, stdio: ['ignore', out, out] });
       child.unref();
@@ -447,7 +543,11 @@ app.post('/api/actions/:action', (req, res) => {
     }
     if (action === 'start-ue') {
       if (pgrep('nr-ue').length) return res.json({ ok: true, message: 'UE já está rodando' });
+      if (!fs.existsSync(UE_BIN)) {
+        return res.status(400).json({ error: 'UERANSIM não está nesta máquina. O UE sobe no host do RAN.' });
+      }
       const cfg = fs.existsSync(UE_CFG) ? UE_CFG : '/opt/UERANSIM/config/open5gs-ue.yaml';
+      if (!fs.existsSync(cfg)) return res.status(400).json({ error: 'Arquivo de configuração do UE não encontrado' });
       // ensure namespace mode
       try {
         let txt = fs.readFileSync(cfg, 'utf8');
@@ -474,6 +574,8 @@ app.post('/api/actions/:action', (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+require('./tests-api').register(app);
 
 app.get('/api/logs/:kind', (req, res) => {
   const kind = req.params.kind;

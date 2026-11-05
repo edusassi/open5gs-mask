@@ -19,7 +19,7 @@
     </div>
     <div class="top-actions">
       <span id="clock" class="clock">—</span>
-      <a class="btn ghost" href="http://localhost:9999" target="_blank" rel="noopener">WebUI SIMs</a>
+      <a class="btn ghost" id="link-webui" href="http://localhost:9999" target="_blank" rel="noopener">WebUI SIMs</a>
       <button class="btn" id="btn-refresh" type="button">Atualizar</button>
     </div>
   </header>
@@ -29,6 +29,7 @@
     <button class="tab" data-tab="sims" type="button">SIM cards</button>
     <button class="tab" data-tab="ran" type="button">UERANSIM</button>
     <button class="tab" data-tab="config" type="button">Configuração</button>
+    <button class="tab" data-tab="test" type="button">Teste</button>
   </nav>
 
   <main>
@@ -92,7 +93,7 @@
             <h3>SIM cards</h3>
             <p class="muted">Assinantes no Core. Para criar/editar chaves K/OPc, use a WebUI oficial.</p>
           </div>
-          <a class="btn ghost" href="http://localhost:9999" target="_blank" rel="noopener">Abrir cadastro</a>
+          <a class="btn ghost" id="link-webui-sims" href="http://localhost:9999" target="_blank" rel="noopener">Abrir cadastro</a>
         </header>
         <div class="table-wrap">
           <table>
@@ -203,6 +204,61 @@
           <button class="btn" type="submit">Salvar UPF</button>
         </form>
       </div>
+    </section>
+
+    <section id="tab-test" class="panel">
+      <div class="grid-2">
+        <section class="block">
+          <header class="block-head">
+            <div>
+              <h3>Novo teste</h3>
+              <p class="muted">O gNB fica ativo na VM do UERANSIM. Cada UE usa um SIM com APN internet. O iperf3 mede upload e download ao mesmo tempo, e o ping mede a latência durante o teste.</p>
+            </div>
+          </header>
+          <div class="fields">
+            <label>UEs simultâneas
+              <select id="test-ue-count"></select>
+            </label>
+            <label>Duração
+              <input id="test-minutes" type="range" min="1" max="5" step="1" value="1" />
+            </label>
+          </div>
+          <p class="stat-note" id="test-minutes-label">1 minuto</p>
+          <div id="test-sim-picks" class="fields"></div>
+          <div class="btn-row">
+            <button class="btn" id="btn-run-test" type="button">Executar teste</button>
+            <button class="btn ghost" id="btn-latency" type="button">Testar latência</button>
+          </div>
+          <p class="muted" id="test-live">Nenhum teste em andamento.</p>
+        </section>
+        <section class="block">
+          <header class="block-head"><h3>Testes executados</h3></header>
+          <div id="test-list" class="list"></div>
+        </section>
+      </div>
+      <section class="block" id="test-detail" hidden>
+        <header class="block-head">
+          <div>
+            <h3 id="test-detail-title">Resultado</h3>
+            <p class="muted" id="test-detail-meta"></p>
+          </div>
+        </header>
+        <div class="chart-grid">
+          <article class="chart-card">
+            <h4>Upload</h4>
+            <canvas id="chart-up" width="900" height="220"></canvas>
+          </article>
+          <article class="chart-card">
+            <h4>Download</h4>
+            <canvas id="chart-down" width="900" height="220"></canvas>
+          </article>
+          <article class="chart-card">
+            <h4>Latência</h4>
+            <canvas id="chart-rtt" width="900" height="220"></canvas>
+          </article>
+        </div>
+        <pre class="log" id="test-logs">Sem logs.</pre>
+      </section>
     </section>
   </main>
 

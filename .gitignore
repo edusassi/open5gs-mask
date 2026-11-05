@@ -19,6 +19,10 @@ Thumbs.db
 .vscode/
 *.tmp
 
+# Test runs and one-off lab scripts
+dashboard/testes/
+dashboard/_*.sh
+
 # Secrets / local overrides
 .env
 .env.*
